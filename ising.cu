@@ -1,3 +1,5 @@
+#include <curand_kernel.h>
+
 #define BLOCK_SIZE 16
 
 //! Perform the Ising simulation
@@ -13,6 +15,15 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 	int tx = blockIdx.x * BLOCK_SIZE + threadIdx.x;
 	int ty = blockIdx.y * BLOCK_SIZE + threadIdx.y;
 	int deltaU, top, bottom, left, right;
+	curandState_t state;
+
+	//Initialize random number generator
+	/* From the curand library guide:
+	   Each experiment should be assigned a unique seed.
+	   Each thread should have a unique sequenc number. 
+	*/
+	//TODO: Add seed and sequence
+	curand_init(0, 0, 0, &state); //seed, sequence, offset
 
 	//Load sublattice into shared memory
 	if(tx < width && ty < height) {
@@ -79,7 +90,7 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 					if(deltaU <= 0)
 						slattice[threadIdx.y][threadIdx.x] *= -1;
 					else {
-						rand = curand_uniform(randState);
+						rand = curand_uniform(&state);
 						//TODO: Put in a more precise value of e
 						//Else the probability of a flip is given by the Boltzmann factor
 						if(rand < powf(2.71f, -deltaU/T))
