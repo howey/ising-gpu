@@ -90,4 +90,11 @@ __global__ void ising(int * lattice, int height, int width, float T) {
 
 }
 
+//! Generate an image file of the lattice and write it to disk
+//! @param lattice A 2D array of ints, whose values are either 1 or -1.
+//! @param height The number of rows of the lattice
+//! @param width The number of colums of the lattice
+//! @param filename The name of the file to write to.
+void print(int * lattice, int height, int width, char * filename) {
 
+}
