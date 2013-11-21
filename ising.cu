@@ -1,4 +1,5 @@
 #include <curand_kernel.h>
+#include <stdio.h>
 
 #define BLOCK_SIZE 16
 
@@ -8,7 +9,7 @@
 //! @param width The number of columns of the input lattice.
 //! @param T The temperature, in units of epsilon/k. Epsilon is the exchange energy and k is the boltzmann constant.
 //! #param iterations The number of Metropolis iterations to perform.
-__global__ void ising(int * lattice, int height, int width, float T, unsigned int iterations) {
+__global__ void ising(int * lattice, int height, int width, float T, unsigned long iterations) {
 	__shared__ int slattice[BLOCK_SIZE][BLOCK_SIZE];
 	__shared__ int sneighbors[4 * BLOCK_SIZE];
 
@@ -23,7 +24,7 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 	   Each thread should have a unique sequenc number. 
 	*/
 	//TODO: Add seed and sequence
-	curand_init(0, ty * width + tx, 0, &state); //seed, sequence, offset
+	curand_init(1234, ty * width + tx, 0, &state); //seed, sequence, offset
 
 	//Load sublattice into shared memory
 	if(tx < width && ty < height) {
@@ -114,11 +115,16 @@ void print(int * lattice, int height, int width, char * filename) {
 
 }
 
-int main() {
+int main(int argc, char ** argv) {
 
-	int height = 100;
-	int width = 100;
+	int height = 4096;
+	int width = 4096;
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
+	if(argc < 2) {
+                printf("Usage: %s [temperature]\n", argv[0]);
+                return 0;
+        }
+	float T = strtof(argv[1], NULL);
 
 	for(int i = 0; i < (height * width); i++) {
 		lattice[i] = 1;
@@ -130,9 +136,16 @@ int main() {
 	
 	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
 	dim3 gridDim(ceil(height/BLOCK_SIZE), ceil(width/BLOCK_SIZE), 1);
-	ising<<<gridDim, blockDim>>>(lattice_d, height, width, 3.0f, 10000000);
+	ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, 1000000000);
 	
 	cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
 
+	float magnetization = 0;
+	for(int i = 0; i < (height * width); i++) {
+		magnetization += lattice[i];
+	}
+	magnetization /= (height * width);
+
+	printf("%f\n", magnetization);
 	return 0;
 }
