@@ -11,7 +11,7 @@
 //! @param width The number of columns of the input lattice.
 //! @param T The temperature, in units of epsilon/k. Epsilon is the exchange energy and k is the boltzmann constant.
 //! #param iterations The number of Metropolis iterations to perform.
-__global__ void ising(int * lattice, int height, int width, float T, unsigned long iterations) {
+__global__ void ising(int * lattice, int height, int width, float T, long iterations) {
 	__shared__ int slattice[BLOCK_SIZE][BLOCK_SIZE];
 	__shared__ int sneighbors[4 * BLOCK_SIZE];
 
@@ -62,7 +62,7 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned lo
 
 		//Perform simulation
 		//Each turn of the loop performs BLOCK_SIZE^2 iterations of the Metropolis algorithm
-		for(int k = 0; k < iterations; k += (BLOCK_SIZE * BLOCK_SIZE)) {
+		for(int k = 0; k < iterations; k++) {
 			for(int i = 0; i < 2; i ++) {
 				//Checkerboard
 				if((threadIdx.x + threadIdx.y) % 2 == i) {
@@ -119,19 +119,21 @@ void print(int * lattice, int height, int width, char * filename) {
 
 int main(int argc, char ** argv) {
 
-	int height = 16;
-	int width = 16;
+	int height = 96;
+	int width = 96;
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
 	
 	srand(time(NULL));
-	if(argc < 2) {
-                printf("Usage: %s [temperature]\n", argv[0]);
+	if(argc < 3) {
+                printf("Usage: %s [iterations] [temperature]\n", argv[0]);
                 return 0;
         }
-	float T = strtof(argv[1], NULL);
+	long n = strtol(argv[1], NULL, 0);
+	float T = strtof(argv[2], NULL);
 
 	for(int i = 0; i < (height * width); i++) {
-		lattice[i] = (rand() % 2 ? 1 : -1);
+		//lattice[i] = (rand() % 2 ? 1 : -1);
+		lattice[i] = 1; 
 	}
 
 	int * lattice_d = NULL;
@@ -140,7 +142,7 @@ int main(int argc, char ** argv) {
 	
 	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
 	dim3 gridDim(ceil(height/BLOCK_SIZE), ceil(width/BLOCK_SIZE), 1);
-	ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, 100000000000);
+	ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, n);
 	
 	cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
 
