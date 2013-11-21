@@ -23,7 +23,7 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 	   Each thread should have a unique sequenc number. 
 	*/
 	//TODO: Add seed and sequence
-	curand_init(0, 0, 0, &state); //seed, sequence, offset
+	curand_init(0, ty * width + tx, 0, &state); //seed, sequence, offset
 
 	//Load sublattice into shared memory
 	if(tx < width && ty < height) {
@@ -100,7 +100,7 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 				}
 			}
 		}
-	slattice[threadIdx.y][threadIdx.x] = lattice[ty * width + threadIdx.x];
+	lattice[ty * width + threadIdx.x] = slattice[threadIdx.y][threadIdx.x]; 
 	}
 
 }
@@ -125,7 +125,7 @@ int main() {
 	}
 
 	int * lattice_d = NULL;
-	cudaMalloc((void **)lattice_d, sizeof(int) * height * width);
+	cudaMalloc((void **)&lattice_d, sizeof(int) * height * width);
 	cudaMemcpy(lattice_d, lattice, height * width * sizeof(int), cudaMemcpyHostToDevice);
 	
 	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
