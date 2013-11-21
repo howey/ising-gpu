@@ -74,7 +74,7 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 						left = slattice[threadIdx.y][threadIdx.x - 1];
 
 					if(threadIdx.y == (BLOCK_SIZE - 1))
-						bottom = sneighbors[2 * BLOCK_SIZE + threadIdx.x]
+						bottom = sneighbors[2 * BLOCK_SIZE + threadIdx.x];
 					else
 						bottom = slattice[threadIdx.y + 1][threadIdx.x];
 
@@ -90,7 +90,7 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 					if(deltaU <= 0)
 						slattice[threadIdx.y][threadIdx.x] *= -1;
 					else {
-						rand = curand_uniform(&state);
+						float rand = curand_uniform(&state);
 						//TODO: Put in a more precise value of e
 						//Else the probability of a flip is given by the Boltzmann factor
 						if(rand < powf(2.71f, -deltaU/T))
@@ -112,4 +112,27 @@ __global__ void ising(int * lattice, int height, int width, float T, unsigned in
 //! @param filename The name of the file to write to.
 void print(int * lattice, int height, int width, char * filename) {
 
+}
+
+int main() {
+
+	int height = 100;
+	int width = 100;
+	int * lattice = (int *)malloc(sizeof(int) * height * width);
+
+	for(int i = 0; i < (height * width); i++) {
+		lattice[i] = 1;
+	}
+
+	int * lattice_d = NULL;
+	cudaMalloc((void **)lattice_d, sizeof(int) * height * width);
+	cudaMemcpy(lattice_d, lattice, height * width * sizeof(int), cudaMemcpyHostToDevice);
+	
+	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
+	dim3 gridDim(ceil(height/BLOCK_SIZE), ceil(width/BLOCK_SIZE), 1);
+	ising<<<gridDim, blockDim>>>(lattice_d, height, width, 3.0f, 10000000);
+	
+	cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
+
+	return 0;
 }
