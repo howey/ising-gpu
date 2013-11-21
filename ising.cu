@@ -1,5 +1,7 @@
 #include <curand_kernel.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define BLOCK_SIZE 16
 
@@ -117,9 +119,11 @@ void print(int * lattice, int height, int width, char * filename) {
 
 int main(int argc, char ** argv) {
 
-	int height = 4096;
-	int width = 4096;
+	int height = 16;
+	int width = 16;
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
+	
+	srand(time(NULL));
 	if(argc < 2) {
                 printf("Usage: %s [temperature]\n", argv[0]);
                 return 0;
@@ -127,7 +131,7 @@ int main(int argc, char ** argv) {
 	float T = strtof(argv[1], NULL);
 
 	for(int i = 0; i < (height * width); i++) {
-		lattice[i] = 1;
+		lattice[i] = (rand() % 2 ? 1 : -1);
 	}
 
 	int * lattice_d = NULL;
@@ -136,7 +140,7 @@ int main(int argc, char ** argv) {
 	
 	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
 	dim3 gridDim(ceil(height/BLOCK_SIZE), ceil(width/BLOCK_SIZE), 1);
-	ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, 1000000000);
+	ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, 100000000000);
 	
 	cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
 
