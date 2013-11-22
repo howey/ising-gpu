@@ -4,6 +4,7 @@
 #include <time.h>
 
 #define BLOCK_SIZE 16
+#define E_CONST 2.71828182845904523536f
 
 //! Perform the Ising simulation
 //! @param lattice A pointer to the lattice of atoms.
@@ -11,22 +12,23 @@
 //! @param width The number of columns of the input lattice.
 //! @param T The temperature, in units of epsilon/k. Epsilon is the exchange energy and k is the boltzmann constant.
 //! #param iterations The number of Metropolis iterations to perform.
-__global__ void ising(int * lattice, int height, int width, float T, long iterations) {
+__global__ void ising(int * lattice, int height, int width, float T, long iterations, unsigned long long seed) {
 	__shared__ int slattice[BLOCK_SIZE][BLOCK_SIZE];
 	__shared__ int sneighbors[4 * BLOCK_SIZE];
 
 	int tx = blockIdx.x * BLOCK_SIZE + threadIdx.x;
 	int ty = blockIdx.y * BLOCK_SIZE + threadIdx.y;
 	int deltaU, top, bottom, left, right;
-	curandState_t state;
+	curandStatePhilox4_32_10_t state;
 
 	//Initialize random number generator
 	/* From the curand library guide:
 	   Each experiment should be assigned a unique seed.
 	   Each thread should have a unique sequenc number. 
 	*/
-	//TODO: Add seed and sequence
-	curand_init(1234, ty * width + tx, 0, &state); //seed, sequence, offset
+	//TODO: It may be beneficial to separate calls to curand_init() and curand() into separate kernels for maximum performance.
+	//See 3.5: Performance notes of curand library guide
+	curand_init(seed, ty * width + tx, 0, &state); //seed, sequence, offset
 
 	//Load sublattice into shared memory
 	if(tx < width && ty < height) {
@@ -94,9 +96,8 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 						slattice[threadIdx.y][threadIdx.x] *= -1;
 					else {
 						float rand = curand_uniform(&state);
-						//TODO: Put in a more precise value of e
 						//Else the probability of a flip is given by the Boltzmann factor
-						if(rand < powf(2.71f, -deltaU/T))
+						if(rand < powf(E_CONST, -deltaU/T))
 							slattice[threadIdx.y][threadIdx.x] *= -1;
 					}
 					__syncthreads(); //Is this needed?
@@ -118,11 +119,10 @@ void print(int * lattice, int height, int width, char * filename) {
 }
 
 int main(int argc, char ** argv) {
-
-	int height = 96;
-	int width = 96;
+	int height = 40;
+	int width = 40;
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
-	
+
 	srand(time(NULL));
 	if(argc < 3) {
                 printf("Usage: %s [iterations] [temperature]\n", argv[0]);
@@ -139,10 +139,11 @@ int main(int argc, char ** argv) {
 	int * lattice_d = NULL;
 	cudaMalloc((void **)&lattice_d, sizeof(int) * height * width);
 	cudaMemcpy(lattice_d, lattice, height * width * sizeof(int), cudaMemcpyHostToDevice);
-	
+
 	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
 	dim3 gridDim(ceil(height/BLOCK_SIZE), ceil(width/BLOCK_SIZE), 1);
-	ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, n);
+	unsigned long long seed = rand();
+	ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, n, seed);
 	
 	cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
 
