@@ -119,8 +119,8 @@ void print(int * lattice, int height, int width, char * filename) {
 }
 
 int main(int argc, char ** argv) {
-	int height = 40;
-	int width = 40;
+	int height = 160;
+	int width = 160;
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
 
 	srand(time(NULL));
@@ -153,6 +153,12 @@ int main(int argc, char ** argv) {
 	}
 	magnetization /= (height * width);
 
-	printf("%f\n", magnetization);
+	for(int i = 0; i < height; i++) {
+		for(int j = 0; j < width; j++) {
+			printf("%d ", lattice[i * width + j]);
+		}
+		printf("\n");
+	}
+	//printf("%f\n", magnetization);
 	return 0;
 }
