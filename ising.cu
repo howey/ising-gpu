@@ -104,7 +104,7 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 				}
 			}
 		}
-	lattice[ty * width + threadIdx.x] = slattice[threadIdx.y][threadIdx.x]; 
+	lattice[ty * width + tx] = slattice[threadIdx.y][threadIdx.x]; 
 	}
 
 }
