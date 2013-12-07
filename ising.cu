@@ -134,9 +134,16 @@ int main(int argc, char ** argv) {
 	dim3 gridDim(ceil(height/BLOCK_SIZE), ceil(width/BLOCK_SIZE), 1);
 	unsigned long long seed;
 	float magnetization = 0;
+	cudaEvent_t start, stop;
 
+	float kernelTime = 0;
+	float totalKernelTime = 0;
 	//Seed random number generator for kernel call
 	srand(time(NULL));
+
+	//Create timer for timing kernel 
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
 
 	if(argc < 3) {
                 printf("Usage: %s [iterations] [temperature]\n", argv[0]);
@@ -155,8 +162,17 @@ int main(int argc, char ** argv) {
 		cudaMalloc((void **)&lattice_d, sizeof(int) * height * width);
 		cudaMemcpy(lattice_d, lattice, height * width * sizeof(int), cudaMemcpyHostToDevice);
 		seed = rand();
+
+		//Call the kernel
+		cudaEventRecord(start, 0);
 		ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, n, seed);
-		
+		cudaThreadSynchronize(); //Sync kernel to avoid erroneous time measurements
+		cudaEventRecord(stop, 0);
+		cudaEventSynchronize(stop);
+
+		cudaEventElapsedTime(&kernelTime, start, stop);
+		totalKernelTime += kernelTime;
+
 		cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
 
 		magnetization = 0;
@@ -174,6 +190,10 @@ int main(int argc, char ** argv) {
 		}
 		*/
 		printf("%f %f\n", T, magnetization);
+
 	}
+	cudaEventDestroy(start);
+	cudaEventDestroy(stop);
+	printf("Average kernel execution time: %f ms\n", totalKernelTime/300.0f);
 	return 0;
 }
