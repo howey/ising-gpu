@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 16 
 #define E_CONST 2.71828182845904523536f
 
 //! Perform the Ising simulation
@@ -30,9 +30,13 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 	//See 3.5: Performance notes of curand library guide
 	curand_init(seed, ty * width + tx, 0, &state); //seed, sequence, offset
 
+		//Perform simulation
+		//Each turn of the loop performs BLOCK_SIZE^2 iterations of the Metropolis algorithm
+		for(int k = 0; k < iterations; k++) {
+
 	//Load sublattice into shared memory
 	if(tx < width && ty < height) {
-		slattice[threadIdx.y][threadIdx.x] = lattice[ty * width + threadIdx.x];
+		slattice[threadIdx.y][threadIdx.x] = lattice[ty * width + tx];
 		if(threadIdx.y == 0) {
 			if(ty == 0)
 				sneighbors[threadIdx.x] = lattice[(height - 1) * width + tx];
@@ -62,9 +66,6 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 		}
 		__syncthreads();
 
-		//Perform simulation
-		//Each turn of the loop performs BLOCK_SIZE^2 iterations of the Metropolis algorithm
-		for(int k = 0; k < iterations; k++) {
 			for(int i = 0; i < 2; i ++) {
 				//Checkerboard
 				if((threadIdx.x + threadIdx.y) % 2 == i) {
@@ -105,7 +106,8 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 			}
 		}
 	lattice[ty * width + tx] = slattice[threadIdx.y][threadIdx.x]; 
-	}
+	__syncthreads();
+		}
 
 }
 
@@ -119,11 +121,15 @@ void print(int * lattice, int height, int width, char * filename) {
 }
 
 int main(int argc, char ** argv) {
-	int height = 160;
-	int width = 160;
+	//The height and width of the lattice
+	int height = 400;
+	int width = 400;
+
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
 
+	//Seed random number generator for kernel call
 	srand(time(NULL));
+
 	if(argc < 3) {
                 printf("Usage: %s [iterations] [temperature]\n", argv[0]);
                 return 0;
@@ -131,6 +137,7 @@ int main(int argc, char ** argv) {
 	long n = strtol(argv[1], NULL, 0);
 	float T = strtof(argv[2], NULL);
 
+	//Initialize input lattice
 	for(int i = 0; i < (height * width); i++) {
 		//lattice[i] = (rand() % 2 ? 1 : -1);
 		lattice[i] = 1; 
@@ -153,12 +160,14 @@ int main(int argc, char ** argv) {
 	}
 	magnetization /= (height * width);
 
+	/*
 	for(int i = 0; i < height; i++) {
 		for(int j = 0; j < width; j++) {
 			printf("%d ", lattice[i * width + j]);
 		}
 		printf("\n");
 	}
-	//printf("%f\n", magnetization);
+	*/
+	printf("%f\n", magnetization);
 	return 0;
 }
