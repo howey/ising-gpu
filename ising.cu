@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <fstream>
 
 #define BLOCK_SIZE 16 
 #define E_CONST 2.71828182845904523536f
@@ -119,11 +120,32 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 //! @param width The number of colums of the lattice
 //! @param filename The name of the file to write to.
 void print(int * lattice, int height, int width, char * filename) {
+	char filename_with_ext[64];
 
+	sprintf(filename_with_ext, "%s%s", filename, ".pbm");
+	std::ofstream outfile (filename_with_ext,std::ofstream::out);
+
+	outfile.write("P1", 2);
+
+	for(int i = 0; i < height; i++){
+		for(int j = 0; j < width; j++){
+			if(lattice[j + (width * i)] == 1){
+				outfile.put('1');
+			}else{
+				outfile.put('0');
+			}
+			outfile.put(' ');
+		}
+
+		outfile.put('\n');
+	}
 }
 
 int main(int argc, char ** argv) {
-	//The height and width of the lattice
+	// Place to build filename
+	char filename[64];
+
+	// The height and width of the lattice
 	int height = 400;
 	int width = 400;
 
@@ -191,6 +213,8 @@ int main(int argc, char ** argv) {
 		*/
 		printf("%f %f\n", T, magnetization);
 
+		sprintf(filename, "T%.2f", T);
+		print(lattice, height, width, filename);
 	}
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);
