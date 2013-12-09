@@ -146,8 +146,17 @@ int main(int argc, char ** argv) {
 	char filename[64];
 
 	// The height and width of the lattice
-	int height = 400;
-	int width = 400;
+	int height;
+	int width;
+
+	if(argc < 3) {
+                printf("Usage: %s [iterations] [size length]\n", argv[0]);
+                return 0;
+        }
+	long n = strtol(argv[1], NULL, 0);
+	//float T = strtof(argv[2], NULL);
+	height = (int)strtol(argv[2], NULL, 0);
+	width = height;
 
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
 	int * lattice_d = NULL;
@@ -167,14 +176,7 @@ int main(int argc, char ** argv) {
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 
-	if(argc < 3) {
-                printf("Usage: %s [iterations] [temperature]\n", argv[0]);
-                return 0;
-        }
-	long n = strtol(argv[1], NULL, 0);
-	float T = strtof(argv[2], NULL);
-
-	for(T = 0.0; T < 3.0; T += 0.01) {
+	for(float T = 0.0; T < 3.0; T += 0.01) {
 		//Initialize input lattice
 		for(int i = 0; i < (height * width); i++) {
 			//lattice[i] = (rand() % 2 ? 1 : -1);
