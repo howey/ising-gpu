@@ -7,6 +7,13 @@
 #define BLOCK_SIZE 16 
 #define E_CONST 2.71828182845904523536f
 
+// fatal macro
+#define FATAL(msg, ...) \
+    do {\
+        fprintf(stderr, "[%s:%d] "msg"\n", __FILE__, __LINE__, ##__VA_ARGS__);\
+        exit(-1);\
+    } while(0)
+
 //! Perform the Ising simulation
 //! @param lattice A pointer to the lattice of atoms.
 //! @param height The number of rows of the input lattice.
@@ -162,6 +169,7 @@ int main(int argc, char ** argv) {
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
 	int * lattice_d = NULL;
 
+	cudaError_t cuda_ret;
 	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
 	dim3 gridDim(ceil(height/BLOCK_SIZE), ceil(width/BLOCK_SIZE), 1);
 	unsigned long long seed;
@@ -197,6 +205,11 @@ int main(int argc, char ** argv) {
 
 		cudaEventElapsedTime(&kernelTime, start, stop);
 		totalKernelTime += kernelTime;
+
+
+		cuda_ret = cudaDeviceSynchronize();
+		printf("%u\n", cuda_ret);
+		if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");
 
 		cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
 
