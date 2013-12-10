@@ -120,12 +120,13 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 //! @param width The number of colums of the lattice
 //! @param filename The name of the file to write to.
 void print(int * lattice, int height, int width, char * filename) {
-	char filename_with_ext[64];
+	char filename_with_ext[64], header[64];
 
 	sprintf(filename_with_ext, "%s%s", filename, ".pbm");
 	std::ofstream outfile (filename_with_ext,std::ofstream::out);
 
-	outfile.write("P1", 2);
+	sprintf(header, "P1 %i %i\n", width, height);
+	outfile.write(header, strlen(header));
 
 	for(int i = 0; i < height; i++){
 		for(int j = 0; j < width; j++){
