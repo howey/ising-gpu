@@ -1,0 +1,8 @@
+#Binary Files
+a.out
+a.exe
+ising
+ising.exe
+
+#Generated Images
+*.pbm
