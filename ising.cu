@@ -20,7 +20,7 @@
 //! @param width The number of columns of the input lattice.
 //! @param T The temperature, in units of epsilon/k. Epsilon is the exchange energy and k is the boltzmann constant.
 //! #param iterations The number of Metropolis iterations to perform.
-__global__ void ising(int * lattice, int height, int width, float T, long iterations, unsigned long long seed) {
+__global__ void ising(const int * lattice_in, int * lattice_out, int height, int width, float T, unsigned long long seed) {
 	__shared__ int slattice[BLOCK_SIZE][BLOCK_SIZE];
 	__shared__ int sneighbors[4 * BLOCK_SIZE];
 
@@ -40,84 +40,83 @@ __global__ void ising(int * lattice, int height, int width, float T, long iterat
 
 	//Perform simulation
 	//Each turn of the loop performs BLOCK_SIZE^2 iterations of the Metropolis algorithm
-	slattice[threadIdx.y][threadIdx.x] = lattice[ty * width + tx];
-	for(int k = 0; k < iterations; k++) {
+	slattice[threadIdx.y][threadIdx.x] = lattice_in[ty * width + tx];
 
-		//Load sublattice into shared memory
-		if(tx < width && ty < height) {
-			if(threadIdx.y == 0) {
-				if(ty == 0)
-					sneighbors[threadIdx.x] = lattice[(height - 1) * width + tx];
-				else
-					sneighbors[threadIdx.x] = lattice[(ty - 1) * width + tx];
-			}
+	//Load sublattice into shared memory
+	if(tx < width && ty < height) {
+		if(threadIdx.y == 0) {
+			if(ty == 0)
+				sneighbors[threadIdx.x] = lattice_in[(height - 1) * width + tx];
+			else
+				sneighbors[threadIdx.x] = lattice_in[(ty - 1) * width + tx];
+		}
 
-			if(threadIdx.y == (BLOCK_SIZE - 1)) {
-				if(ty == (height - 1))
-					sneighbors[2 * BLOCK_SIZE + threadIdx.x] = lattice[tx];
-				else
-					sneighbors[2 * BLOCK_SIZE + threadIdx.x] = lattice[(ty + 1) * width + tx];
-			}
+		if(threadIdx.y == (BLOCK_SIZE - 1)) {
+			if(ty == (height - 1))
+				sneighbors[2 * BLOCK_SIZE + threadIdx.x] = lattice_in[tx];
+			else
+				sneighbors[2 * BLOCK_SIZE + threadIdx.x] = lattice_in[(ty + 1) * width + tx];
+		}
 
-			if(threadIdx.x == 0) {
-				if(tx == 0)
-					sneighbors[3 * BLOCK_SIZE + threadIdx.y] = lattice[ty * width + (width - 1)];
-				else
-					sneighbors[3 * BLOCK_SIZE + threadIdx.y] = lattice[ty * width + (tx - 1)];
-			}
+		if(threadIdx.x == 0) {
+			if(tx == 0)
+				sneighbors[3 * BLOCK_SIZE + threadIdx.y] = lattice_in[ty * width + (width - 1)];
+			else
+				sneighbors[3 * BLOCK_SIZE + threadIdx.y] = lattice_in[ty * width + (tx - 1)];
+		}
 
-			if(threadIdx.x == (BLOCK_SIZE - 1)) {
-				if(tx == (width - 1))
-					sneighbors[BLOCK_SIZE + threadIdx.y] = lattice[ty * width];
-				else
-					sneighbors[BLOCK_SIZE + threadIdx.y] = lattice[ty * width + (tx + 1)];
-			}
-			__syncthreads();
+		if(threadIdx.x == (BLOCK_SIZE - 1)) {
+			if(tx == (width - 1))
+				sneighbors[BLOCK_SIZE + threadIdx.y] = lattice_in[ty * width];
+			else
+				sneighbors[BLOCK_SIZE + threadIdx.y] = lattice_in[ty * width + (tx + 1)];
+		}
+		__syncthreads();
 
-				for(int i = 0; i < 2; i ++) {
-					//Checkerboard
-					if((threadIdx.x + threadIdx.y) % 2 == i) {
-						if(threadIdx.y == 0)
-							top = sneighbors[threadIdx.x]; 
-						else
-							top = slattice[threadIdx.y - 1][threadIdx.x];
-						
-						if(threadIdx.x == 0)
-							left = sneighbors[3 * BLOCK_SIZE + threadIdx.y];
-						else
-							left = slattice[threadIdx.y][threadIdx.x - 1];
+			for(int i = 0; i < 2; i ++) {
+				//Checkerboard
+				if((threadIdx.x + threadIdx.y) % 2 == i) {
+					if(threadIdx.y == 0)
+						top = sneighbors[threadIdx.x]; 
+					else
+						top = slattice[threadIdx.y - 1][threadIdx.x];
+					
+					if(threadIdx.x == 0)
+						left = sneighbors[3 * BLOCK_SIZE + threadIdx.y];
+					else
+						left = slattice[threadIdx.y][threadIdx.x - 1];
 
-						if(threadIdx.y == (BLOCK_SIZE - 1))
-							bottom = sneighbors[2 * BLOCK_SIZE + threadIdx.x];
-						else
-							bottom = slattice[threadIdx.y + 1][threadIdx.x];
+					if(threadIdx.y == (BLOCK_SIZE - 1))
+						bottom = sneighbors[2 * BLOCK_SIZE + threadIdx.x];
+					else
+						bottom = slattice[threadIdx.y + 1][threadIdx.x];
 
-						if(threadIdx.x == (BLOCK_SIZE - 1))
-							right = sneighbors[BLOCK_SIZE + threadIdx.y]; 
-						else
-							right = slattice[threadIdx.y][threadIdx.x + 1];
+					if(threadIdx.x == (BLOCK_SIZE - 1))
+						right = sneighbors[BLOCK_SIZE + threadIdx.y]; 
+					else
+						right = slattice[threadIdx.y][threadIdx.x + 1];
 
-						//Calculate change in energy if dipole were flipped
-						deltaU = 2 * slattice[threadIdx.y][threadIdx.x] * (top + bottom + left + right);
+					//Calculate change in energy if dipole were flipped
+					deltaU = 2 * slattice[threadIdx.y][threadIdx.x] * (top + bottom + left + right);
 
-						//If the energy would decrease, flip the dipole
-						if(deltaU <= 0)
+					//If the energy would decrease, flip the dipole
+					if(deltaU <= 0)
+						slattice[threadIdx.y][threadIdx.x] *= -1;
+					else {
+						float rand = curand_uniform(&state);
+						//Else the probability of a flip is given by the Boltzmann factor
+						if(rand < powf(E_CONST, -deltaU/T))
 							slattice[threadIdx.y][threadIdx.x] *= -1;
-						else {
-							float rand = curand_uniform(&state);
-							//Else the probability of a flip is given by the Boltzmann factor
-							if(rand < powf(E_CONST, -deltaU/T))
-								slattice[threadIdx.y][threadIdx.x] *= -1;
-						}
-						__syncthreads(); //Is this needed?
 					}
+					__syncthreads(); //Is this needed?
 				}
 			}
-		if((threadIdx.x == 0) || (threadIdx.x == (BLOCK_SIZE - 1)) || (threadIdx.y == 0) || (threadIdx.y == (BLOCK_SIZE - 1)))
-			lattice[ty * width + tx] = slattice[threadIdx.y][threadIdx.x]; 
-		__syncthreads();
-			}
-			lattice[ty * width + tx] = slattice[threadIdx.y][threadIdx.x]; 
+		}
+	if((threadIdx.x == 0) || (threadIdx.x == (BLOCK_SIZE - 1)) || (threadIdx.y == 0) || (threadIdx.y == (BLOCK_SIZE - 1)))
+		lattice_out[ty * width + tx] = slattice[threadIdx.y][threadIdx.x]; 
+	__syncthreads();
+
+	lattice_out[ty * width + tx] = slattice[threadIdx.y][threadIdx.x]; 
 
 }
 
@@ -167,7 +166,8 @@ int main(int argc, char ** argv) {
 	width = height;
 
 	int * lattice = (int *)malloc(sizeof(int) * height * width);
-	int * lattice_d = NULL;
+	int * lattice_d1 = NULL;
+	int * lattice_d2 = NULL;
 
 	cudaError_t cuda_ret;
 	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
@@ -175,6 +175,8 @@ int main(int argc, char ** argv) {
 	unsigned long long seed;
 	float magnetization = 0;
 	cudaEvent_t start, stop;
+	cudaStream_t stream; // Single Stream to Use as Device Sync
+	cudaStreamCreate(&stream);
 
 	float kernelTime = 0;
 	float totalKernelTime = 0;
@@ -192,13 +194,20 @@ int main(int argc, char ** argv) {
 			lattice[i] = 1; 
 		}
 
-		cudaMalloc((void **)&lattice_d, sizeof(int) * height * width);
-		cudaMemcpy(lattice_d, lattice, height * width * sizeof(int), cudaMemcpyHostToDevice);
+		cudaMalloc((void **)&lattice_d1, sizeof(int) * height * width);
+		cudaMemcpyAsync(lattice_d1, lattice, height * width * sizeof(int), cudaMemcpyHostToDevice, stream);
+		cudaMalloc((void **)&lattice_d2, sizeof(int) * height * width);
 		seed = rand();
 
 		//Call the kernel
 		cudaEventRecord(start, 0);
-		ising<<<gridDim, blockDim>>>(lattice_d, height, width, T, n, seed);
+		for(int k = 0; k < n; k++) {
+			if(k%2 == 0){
+				ising<<<gridDim, blockDim, 0, stream>>>(lattice_d1, lattice_d2, height, width, T, seed);
+			}else{
+				ising<<<gridDim, blockDim, 0, stream>>>(lattice_d2, lattice_d1, height, width, T, seed);
+			}
+		}
 		cudaThreadSynchronize(); //Sync kernel to avoid erroneous time measurements
 		cudaEventRecord(stop, 0);
 		cudaEventSynchronize(stop);
@@ -208,10 +217,13 @@ int main(int argc, char ** argv) {
 
 
 		cuda_ret = cudaDeviceSynchronize();
-		printf("%u\n", cuda_ret);
-		if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");
+		if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel", cuda_ret);
 
-		cudaMemcpy(lattice, lattice_d, height * width * sizeof(int), cudaMemcpyDeviceToHost);
+		if(n%2 == 0){
+			cudaMemcpy(lattice, lattice_d2, height * width * sizeof(int), cudaMemcpyDeviceToHost);
+		}else{
+			cudaMemcpy(lattice, lattice_d1, height * width * sizeof(int), cudaMemcpyDeviceToHost);
+		}
 
 		magnetization = 0;
 		for(int i = 0; i < (height * width); i++) {
