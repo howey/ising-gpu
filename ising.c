@@ -18,8 +18,10 @@ int main(int argc, char ** argv) {
 		return 0;
 	}
 
-	long iterations = strtol(argv[1], NULL, 0);
+	long long unsigned iterations = strtol(argv[1], NULL, 0);
 	length = (int)strtol(argv[2], NULL, 0);
+
+	iterations = iterations * length * length; // Use "GPU Iterations"
 
 	int * lattice = (int *)malloc(sizeof(int) * length * length);
 
@@ -35,7 +37,7 @@ int main(int argc, char ** argv) {
 		simulate(lattice, iterations, T, length);
 		clock_gettime(CLOCK_REALTIME, &te);
 
-		total_time += (((double)te.tv_nsec) - ((double)ts.tv_nsec))/10;
+		total_time += (((double)te.tv_sec) - ((double)ts.tv_sec));
 
 		float magnetization = 0;
 		for(int i = 0; i < (length * length); i++) {
@@ -46,7 +48,7 @@ int main(int argc, char ** argv) {
 		printf("%f\t%f\n", T, magnetization);
 	}
 
-	printf("Average Execution Time: %.2f ms\n", total_time/30);
+	printf("Average Execution Time: %.2f s\n", total_time/30);
 	return 0;
 }
 
