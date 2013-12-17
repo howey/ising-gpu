@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/timeb.h> // Must be compiled with -lrt flag
 #include <math.h>
 
 //Forward declaration
@@ -9,6 +10,8 @@ void simulate(int *, long, float, int);
 int main(int argc, char ** argv) {
 	//The side length of the lattice
 	int length;
+	double total_time;
+	timespec ts, te;
 	
 	if(argc < 3) {
 		printf("Usage: %s [iterations] [side length]\n", argv[0]);
@@ -28,7 +31,11 @@ int main(int argc, char ** argv) {
 		}
 		
 		//Monte carlo simulation
+		clock_gettime(CLOCK_REALTIME, &ts);
 		simulate(lattice, iterations, T, length);
+		clock_gettime(CLOCK_REALTIME, &te);
+
+		total_time += (((double)te.tv_nsec) - ((double)ts.tv_nsec))/10;
 
 		float magnetization = 0;
 		for(int i = 0; i < (length * length); i++) {
@@ -38,6 +45,8 @@ int main(int argc, char ** argv) {
 		magnetization /= (length * length);
 		printf("%f\t%f\n", T, magnetization);
 	}
+
+	printf("Average Execution Time: %.2f ms\n", total_time/30);
 	return 0;
 }
 
